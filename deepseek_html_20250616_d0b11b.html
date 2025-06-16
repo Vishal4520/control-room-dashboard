@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control Room Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        /* [Previous CSS styles remain exactly the same] */
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Control Room Dashboard</h1>
+        <p id="dashboard-description">Upload your Excel file to view team members and their work statistics</p>
+    </div>
+    
+    <div class="upload-container" id="uploadContainer">
+        <h2>Upload Excel File</h2>
+        <p>Please select your Excel file with control room data</p>
+        <input type="file" id="fileInput" accept=".xlsx, .xls" style="display: none;">
+        <button class="upload-btn" onclick="document.getElementById('fileInput').click()">Choose File</button>
+        <div class="file-name" id="fileName">No file selected</div>
+    </div>
+    
+    <div class="share-container" id="shareContainer">
+        <h2>Share This Dashboard</h2>
+        <p>Copy the link below to share this dashboard with others</p>
+        <input type="text" class="share-link" id="shareLink" readonly>
+        <button class="share-btn" onclick="copyShareLink()">Copy Link</button>
+        <p class="share-note">Note: Shared data will be available for 7 days</p>
+    </div>
+    
+    <div class="dashboard" id="dashboard">
+        <div class="cr-buttons" id="crButtons">
+            <!-- CR buttons will be added here by JavaScript -->
+        </div>
+        
+        <div id="membersContainer">
+            <!-- Member cards will be added here by JavaScript -->
+        </div>
+    </div>
+
+    <script>
+        // Global variable to store the parsed data
+        let controlRooms = {};
+        const STORAGE_PREFIX = "crDashboard_";
+        
+        // Check for URL parameters on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const dataKey = urlParams.get('key');
+            
+            if (dataKey) {
+                loadSharedData(dataKey);
+            } else {
+                // Initialize file input if no shared data
+                document.getElementById('fileInput').addEventListener('change', handleFileUpload);
+            }
+        });
+        
+        function loadSharedData(dataKey) {
+            const savedData = localStorage.getItem(STORAGE_PREFIX + dataKey);
+            
+            if (savedData) {
+                try {
+                    controlRooms = JSON.parse(savedData);
+                    
+                    // Hide upload container and show dashboard
+                    document.getElementById('uploadContainer').style.display = 'none';
+                    document.getElementById('dashboard').style.display = 'flex';
+                    document.getElementById('shareContainer').style.display = 'block';
+                    document.getElementById('dashboard-description').textContent = 'Viewing shared control room data';
+                    
+                    initializeDashboard();
+                } catch (e) {
+                    console.error('Error parsing shared data:', e);
+                    alert('Error loading shared data. The link may have expired or is invalid.');
+                    document.getElementById('uploadContainer').style.display = 'block';
+                }
+            } else {
+                alert('Shared data not found. It may have expired after 7 days.');
+                document.getElementById('uploadContainer').style.display = 'block';
+            }
+        }
+        
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            document.getElementById('fileName').textContent = file.name;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                processExcel(data);
+            };
+            reader.readAsArrayBuffer(file);
+        }
+        
+        function processExcel(data) {
+            const workbook = XLSX.read(data, { type: 'array' });
+            const firstSheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheetName];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+            
+            // Process the Excel data into our format
+            controlRooms = {};
+            
+            // Skip header row (row 0)
+            for (let i = 1; i < jsonData.length; i++) {
+                const row = jsonData[i];
+                if (!row || row.length < 21) continue;
+                
+                const name = row[1] || '';
+                const cr = row[2] || '';
+                
+                if (!name || !cr) continue;
+                
+                if (!controlRooms[cr]) {
+                    controlRooms[cr] = [];
+                }
+                
+                controlRooms[cr].push({
+                    name: name,
+                    stats: {
+                        A: row[3] || 0,
+                        B: row[4] || 0,
+                        C: row[5] || 0,
+                        D: row[6] || 0,
+                        E: row[7] || 0,
+                        G: row[8] || 0,
+                        T: row[9] || 0,
+                        OFF: row[17] || 0,
+                        Leave: row[18] || 0,
+                        "Total working days": row[19] || 0,
+                        "Total hrs": row[20] || 0,
+                        "total night": row[21] || 0
+                    }
+                });
+            }
+            
+            // Show the dashboard and share container
+            document.getElementById('uploadContainer').style.display = 'none';
+            document.getElementById('dashboard').style.display = 'flex';
+            document.getElementById('shareContainer').style.display = 'block';
+            
+            initializeDashboard();
+            generateShareLink();
+        }
+        
+        function initializeDashboard() {
+            const crButtonsContainer = document.getElementById('crButtons');
+            const membersContainer = document.getElementById('membersContainer');
+            
+            // Clear existing buttons
+            crButtonsContainer.innerHTML = '';
+            
+            // Create CR buttons
+            Object.keys(controlRooms).forEach(cr => {
+                const btn = document.createElement('button');
+                btn.className = 'cr-btn';
+                btn.textContent = cr;
+                btn.addEventListener('click', () => showMembers(cr));
+                crButtonsContainer.appendChild(btn);
+            });
+            
+            // Show first CR by default if available
+            if (Object.keys(controlRooms).length > 0) {
+                const firstCr = Object.keys(controlRooms)[0];
+                showMembers(firstCr);
+                document.querySelector('.cr-btn').classList.add('active');
+            }
+        }
+        
+        function showMembers(cr) {
+            const membersContainer = document.getElementById('membersContainer');
+            const crButtons = document.querySelectorAll('.cr-btn');
+            
+            // Update active button
+            crButtons.forEach(btn => {
+                btn.classList.toggle('active', btn.textContent === cr);
+            });
+            
+            // Clear container
+            membersContainer.innerHTML = '';
+            
+            // Create container for this CR's members
+            const container = document.createElement('div');
+            container.className = 'members-container active';
+            container.id = `cr-${cr}`;
+            
+            if (!controlRooms[cr] || controlRooms[cr].length === 0) {
+                container.innerHTML = '<div class="no-members">No members found in this control room</div>';
+            } else {
+                controlRooms[cr].forEach(member => {
+                    container.appendChild(createMemberCard(cr, member));
+                });
+            }
+            
+            membersContainer.appendChild(container);
+        }
+        
+        function createMemberCard(cr, member) {
+            const card = document.createElement('div');
+            card.className = 'member-card';
+            
+            // Member header
+            const header = document.createElement('div');
+            header.className = 'member-header';
+            
+            const name = document.createElement('div');
+            name.className = 'member-name';
+            name.textContent = member.name;
+            
+            const crBadge = document.createElement('div');
+            crBadge.className = 'member-cr';
+            crBadge.textContent = cr;
+            
+            header.appendChild(name);
+            header.appendChild(crBadge);
+            
+            // Stats grid
+            const statsGrid = document.createElement('div');
+            statsGrid.className = 'stats-grid';
+            
+            // Add stat items for A, B, C, D, E, G, T, OFF, Leave
+            const statItems = ['A', 'B', 'C', 'D', 'E', 'G', 'T', 'OFF', 'Leave'];
+            
+            statItems.forEach(stat => {
+                const statItem = document.createElement('div');
+                statItem.className = 'stat-item';
+                
+                const label = document.createElement('div');
+                label.className = 'stat-label';
+                label.textContent = stat;
+                
+                const value = document.createElement('div');
+                value.className = 'stat-value';
+                value.textContent = member.stats[stat] || 0;
+                
+                statItem.appendChild(label);
+                statItem.appendChild(value);
+                statsGrid.appendChild(statItem);
+            });
+            
+            // Summary section
+            const summary = document.createElement('div');
+            summary.className = 'summary';
+            
+            const workingDays = document.createElement('div');
+            workingDays.className = 'summary-item';
+            
+            const daysLabel = document.createElement('div');
+            daysLabel.className = 'summary-label';
+            daysLabel.textContent = 'Working Days';
+            
+            const daysValue = document.createElement('div');
+            daysValue.className = 'summary-value';
+            daysValue.textContent = member.stats['Total working days'];
+            
+            workingDays.appendChild(daysLabel);
+            workingDays.appendChild(daysValue);
+            
+            const totalHours = document.createElement('div');
+            totalHours.className = 'summary-item';
+            
+            const hoursLabel = document.createElement('div');
+            hoursLabel.className = 'summary-label';
+            hoursLabel.textContent = 'Total Hours';
+            
+            const hoursValue = document.createElement('div');
+            hoursValue.className = 'summary-value';
+            hoursValue.textContent = member.stats['Total hrs'];
+            
+            totalHours.appendChild(hoursLabel);
+            totalHours.appendChild(hoursValue);
+            
+            const nightShifts = document.createElement('div');
+            nightShifts.className = 'summary-item';
+            
+            const nightLabel = document.createElement('div');
+            nightLabel.className = 'summary-label';
+            nightLabel.textContent = 'Night Shifts';
+            
+            const nightValue = document.createElement('div');
+            nightValue.className = 'summary-value';
+            nightValue.textContent = member.stats['total night'];
+            
+            nightShifts.appendChild(nightLabel);
+            nightShifts.appendChild(nightValue);
+            
+            summary.appendChild(workingDays);
+            summary.appendChild(totalHours);
+            summary.appendChild(nightShifts);
+            
+            // Assemble the card
+            card.appendChild(header);
+            card.appendChild(statsGrid);
+            card.appendChild(summary);
+            
+            return card;
+        }
+        
+        function generateShareLink() {
+            // Generate a unique key for this data
+            const dataKey = 'key_' + Math.random().toString(36).substring(2, 15);
+            
+            // Store the data in localStorage with expiration
+            const expirationDate = new Date();
+            expirationDate.setDate(expirationDate.getDate() + 7); // 7 days from now
+            const dataToStore = {
+                data: JSON.stringify(controlRooms),
+                expires: expirationDate.getTime()
+            };
+            
+            localStorage.setItem(STORAGE_PREFIX + dataKey, JSON.stringify(dataToStore));
+            
+            // Create the shareable URL
+            const currentUrl = new URL(window.location.href);
+            currentUrl.searchParams.set('key', dataKey);
+            const shareUrl = currentUrl.toString();
+            
+            // Display the shareable link
+            document.getElementById('shareLink').value = shareUrl;
+        }
+        
+        function copyShareLink() {
+            const shareLink = document.getElementById('shareLink');
+            shareLink.select();
+            document.execCommand('copy');
+            
+            // Change button text temporarily to indicate success
+            const copyBtn = document.querySelector('.share-btn');
+            const originalText = copyBtn.textContent;
+            copyBtn.textContent = 'Copied!';
+            
+            setTimeout(() => {
+                copyBtn.textContent = originalText;
+            }, 2000);
+        }
+        
+        // Clean up expired data on load
+        function cleanupExpiredData() {
+            const now = new Date().getTime();
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key.startsWith(STORAGE_PREFIX)) {
+                    try {
+                        const item = JSON.parse(localStorage.getItem(key));
+                        if (item.expires && item.expires < now) {
+                            localStorage.removeItem(key);
+                        }
+                    } catch (e) {
+                        console.error('Error cleaning up data:', e);
+                    }
+                }
+            }
+        }
+        
+        // Run cleanup on load
+        cleanupExpiredData();
+    </script>
+</body>
+</html>
