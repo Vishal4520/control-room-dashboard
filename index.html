@@ -348,6 +348,7 @@
         <p>Copy the link below to share this dashboard with others</p>
         <input type="text" class="share-link" id="shareLink" readonly>
         <button class="share-btn" onclick="copyShareLink()">Copy Link</button>
+        <p class="share-note">Note: Shared data will be available for 7 days</p>
     </div>
     
     <div class="dashboard" id="dashboard">
@@ -363,35 +364,52 @@
     <script>
         // Global variable to store the parsed data
         let controlRooms = {};
+        const STORAGE_PREFIX = "crDashboard_";
+        const SHORTENER_API = "https://api.shrtco.de/v2/shorten?url=";
         
         // Check for URL parameters on page load
         window.addEventListener('DOMContentLoaded', () => {
             const urlParams = new URLSearchParams(window.location.search);
-            const dataParam = urlParams.get('data');
+            const dataKey = urlParams.get('key');
             
-            if (dataParam) {
-                // SHARED VIEW MODE (Dashboard only)
-                try {
-                    controlRooms = JSON.parse(decodeURIComponent(dataParam));
-                    hideUploadSection();
-                    showDashboard();
-                } catch (e) {
-                    alert("Invalid shared data. Please check the link.");
-                }
+            if (dataKey) {
+                loadSharedData(dataKey);
             } else {
-                // UPLOAD MODE (Only shown to you)
+                // Initialize file input if no shared data
                 document.getElementById('fileInput').addEventListener('change', handleFileUpload);
             }
+            cleanupExpiredData();
         });
         
-        function hideUploadSection() {
-            document.getElementById('uploadContainer').style.display = 'none';
-            document.getElementById('dashboard-description').textContent = 'Control Room Dashboard (Shared View)';
-        }
-        
-        function showDashboard() {
-            document.getElementById('dashboard').style.display = 'flex';
-            initializeDashboard();
+        function loadSharedData(dataKey) {
+            const savedData = localStorage.getItem(STORAGE_PREFIX + dataKey);
+            
+            if (savedData) {
+                try {
+                    const item = JSON.parse(savedData);
+                    if (item.expires && item.expires < Date.now()) {
+                        localStorage.removeItem(STORAGE_PREFIX + dataKey);
+                        throw new Error("Data expired");
+                    }
+                    
+                    controlRooms = JSON.parse(item.data);
+                    
+                    // Hide upload container and show dashboard
+                    document.getElementById('uploadContainer').style.display = 'none';
+                    document.getElementById('dashboard').style.display = 'flex';
+                    document.getElementById('shareContainer').style.display = 'none';
+                    document.getElementById('dashboard-description').textContent = 'Viewing shared control room data';
+                    
+                    initializeDashboard();
+                } catch (e) {
+                    console.error('Error loading shared data:', e);
+                    alert('Error loading shared data. The link may have expired or is invalid.');
+                    document.getElementById('uploadContainer').style.display = 'block';
+                }
+            } else {
+                alert('Shared data not found. It may have expired after 7 days.');
+                document.getElementById('uploadContainer').style.display = 'block';
+            }
         }
         
         function handleFileUpload(event) {
@@ -450,9 +468,77 @@
                 });
             }
             
-            hideUploadSection();
-            showDashboard();
+            // Show the dashboard and share container
+            document.getElementById('uploadContainer').style.display = 'none';
+            document.getElementById('dashboard').style.display = 'flex';
+            document.getElementById('shareContainer').style.display = 'block';
+            
+            initializeDashboard();
             generateShareLink();
+        }
+        
+        async function generateShareLink() {
+            // Generate a unique key for this data
+            const dataKey = 'key_' + Math.random().toString(36).substring(2, 15);
+            
+            // Store the data in localStorage with expiration
+            const expirationDate = new Date();
+            expirationDate.setDate(expirationDate.getDate() + 7); // 7 days from now
+            const dataToStore = {
+                data: JSON.stringify(controlRooms),
+                expires: expirationDate.getTime()
+            };
+            
+            localStorage.setItem(STORAGE_PREFIX + dataKey, JSON.stringify(dataToStore));
+            
+            // Create the shareable URL
+            const currentUrl = new URL(window.location.href.split('?')[0]);
+            currentUrl.searchParams.set('key', dataKey);
+            const longUrl = currentUrl.toString();
+            
+            try {
+                // Use URL shortener API
+                const response = await fetch(SHORTENER_API + encodeURIComponent(longUrl));
+                const json = await response.json();
+                const shortUrl = json.result.full_short_link;
+                
+                document.getElementById('shareLink').value = shortUrl;
+            } catch (e) {
+                console.error("URL shortening failed, using long URL:", e);
+                document.getElementById('shareLink').value = longUrl;
+            }
+        }
+        
+        function copyShareLink() {
+            const shareLink = document.getElementById('shareLink');
+            shareLink.select();
+            document.execCommand('copy');
+            
+            // Change button text temporarily to indicate success
+            const copyBtn = document.querySelector('.share-btn');
+            const originalText = copyBtn.textContent;
+            copyBtn.textContent = 'Copied!';
+            
+            setTimeout(() => {
+                copyBtn.textContent = originalText;
+            }, 2000);
+        }
+        
+        function cleanupExpiredData() {
+            const now = Date.now();
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key.startsWith(STORAGE_PREFIX)) {
+                    try {
+                        const item = JSON.parse(localStorage.getItem(key));
+                        if (item.expires && item.expires < now) {
+                            localStorage.removeItem(key);
+                        }
+                    } catch (e) {
+                        console.error('Error cleaning up data:', e);
+                    }
+                }
+            }
         }
         
         function initializeDashboard() {
@@ -606,35 +692,6 @@
             card.appendChild(summary);
             
             return card;
-        }
-        
-        function generateShareLink() {
-            // Convert the data to a JSON string and encode it for URL
-            const dataString = JSON.stringify(controlRooms);
-            const encodedData = encodeURIComponent(dataString);
-            
-            // Create the shareable URL
-            const currentUrl = window.location.href.split('?')[0];
-            const shareUrl = `${currentUrl}?data=${encodedData}`;
-            
-            // Display the shareable link
-            document.getElementById('shareLink').value = shareUrl;
-            document.getElementById('shareContainer').style.display = 'block';
-        }
-        
-        function copyShareLink() {
-            const shareLink = document.getElementById('shareLink');
-            shareLink.select();
-            document.execCommand('copy');
-            
-            // Change button text temporarily to indicate success
-            const copyBtn = document.querySelector('.share-btn');
-            const originalText = copyBtn.textContent;
-            copyBtn.textContent = 'Copied!';
-            
-            setTimeout(() => {
-                copyBtn.textContent = originalText;
-            }, 2000);
         }
     </script>
 </body>
