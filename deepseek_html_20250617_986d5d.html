@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JioBP Control Room Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --primary: #1a5f1a;
+            --secondary: #27ae60;
+            --accent: #2ecc71;
+            --light: #ecf0f1;
+            --dark: #2c3e50;
+            --gradient-start: #1a5f1a;
+            --gradient-end: #27ae60;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: #f5f7fa;
+            color: var(--dark);
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            position: relative;
+        }
+        
+        .header h1 {
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            color: #7f8c8d;
+            font-size: 1.1rem;
+        }
+        
+        .upload-container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+            margin: 0 auto 40px;
+            text-align: center;
+        }
+        
+        .file-upload {
+            position: relative;
+            margin: 25px 0;
+        }
+        
+        .file-upload input[type="file"] {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+        }
+        
+        .file-upload label {
+            display: inline-block;
+            padding: 12px 25px;
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+            color: white;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .file-upload label:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        
+        .file-name {
+            font-size: 0.9rem;
+            margin-top: 10px;
+            color: #7f8c8d;
+        }
+        
+        .share-container {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+            margin: 20px auto;
+            display: none;
+        }
+        
+        .share-box {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .share-link {
+            flex: 1;
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            background: #f8f9fa;
+        }
+        
+        .copy-btn {
+            padding: 0 15px;
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+        
+        .copy-btn:hover {
+            background: linear-gradient(135deg, #15803d, #16a34a);
+        }
+        
+        .timeline-view {
+            display: none;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .member-row {
+            background: white;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+            transition: all 0.3s ease;
+            overflow: hidden;
+            opacity: 0;
+            animation: fadeIn 0.4s ease forwards;
+        }
+        
+        @keyframes fadeIn {
+            to { opacity: 1; }
+        }
+        
+        .member-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            cursor: pointer;
+            background: linear-gradient(90deg, rgba(26,95,26,0.05) 0%, rgba(39,174,96,0.05) 100%);
+            border-left: 4px solid var(--secondary);
+        }
+        
+        .member-name {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+        }
+        
+        .member-cr {
+            background: var(--secondary);
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        
+        .member-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 10px;
+            padding: 0 20px;
+            max-height: 0;
+            overflow: hidden;
+            transition: all 0.4s ease;
+        }
+        
+        .member-row.active .member-stats {
+            padding: 20px;
+            max-height: 500px;
+        }
+        
+        .stat-item {
+            text-align: center;
+            padding: 10px;
+            border-radius: 6px;
+            background: #f8f9fa;
+        }
+        
+        .stat-label {
+            font-size: 0.75rem;
+            color: #7f8c8d;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 5px;
+        }
+        
+        .stat-value {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+        
+        .summary-container {
+            grid-column: 1 / -1;
+            margin-top: 15px;
+        }
+        
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        
+        .summary-item {
+            text-align: center;
+            flex: 1;
+            padding: 0 10px;
+        }
+        
+        .summary-label {
+            font-size: 0.8rem;
+            opacity: 0.9;
+        }
+        
+        .summary-value {
+            font-size: 1.1rem;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+        
+        .cr-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 25px;
+            max-height: 200px;
+            overflow-y: auto;
+            padding: 10px;
+        }
+        
+        .cr-btn {
+            padding: 10px 18px;
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            flex-shrink: 0;
+        }
+        
+        .cr-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+        
+        .cr-btn.active {
+            background: linear-gradient(135deg, #16a085, #1abc9c);
+        }
+        
+        .filter-container {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .search-box {
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 50px;
+            min-width: 250px;
+            font-size: 0.9rem;
+        }
+        
+        @media (max-width: 768px) {
+            .member-stats {
+                grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            }
+            
+            .member-name {
+                font-size: 1.1rem;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .summary-row {
+                flex-direction: column;
+                gap: 15px;
+            }
+            
+            .summary-item {
+                padding: 5px 0;
+            }
+            
+            .filter-container {
+                flex-direction: column;
+                align-items: center;
+            }
+        }
+        
+        .cr-buttons::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        .cr-buttons::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        
+        .cr-buttons::-webkit-scrollbar-thumb {
+            background: var(--secondary);
+            border-radius: 10px;
+        }
+        
+        .cr-buttons::-webkit-scrollbar-thumb:hover {
+            background: var(--primary);
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>JioBP Control Room Dashboard</h1>
+        <p id="dashboard-description">Upload your Excel file to view team members and their work statistics</p>
+    </div>
+    
+    <div class="upload-container" id="uploadContainer">
+        <h2>Upload Excel File</h2>
+        <p>Please select your Excel file with control room data</p>
+        <div class="file-upload">
+            <input type="file" id="fileInput" accept=".xlsx, .xls">
+            <label for="fileInput">Choose File</label>
+            <div class="file-name" id="fileName">No file selected</div>
+        </div>
+    </div>
+    
+    <div class="share-container" id="shareContainer">
+        <h3>Share This Dashboard</h3>
+        <div class="share-box">
+            <input type="text" id="shareableLink" class="share-link" readonly>
+            <button class="copy-btn" id="copyBtn">Copy</button>
+        </div>
+    </div>
+    
+    <div class="timeline-view" id="timelineView">
+        <div class="filter-container">
+            <input type="text" id="searchInput" class="search-box" placeholder="Search members...">
+            <div class="cr-buttons" id="crButtons"></div>
+        </div>
+        <div id="membersContainer"></div>
+    </div>
+
+    <script>
+        let controlRooms = {};
+        let currentCR = '';
+        let allMembers = [];
+        
+        // Handle file upload
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            document.getElementById('fileName').textContent = file.name;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    processExcel(data);
+                } catch (error) {
+                    console.error("Error processing file:", error);
+                    alert("Error processing the file. Please make sure it's a valid Excel file.");
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        });
+        
+        function processExcel(data) {
+            const workbook = XLSX.read(data, { type: 'array' });
+            const firstSheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheetName];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+            
+            controlRooms = {};
+            allMembers = [];
+            
+            // Skip header row (row 0)
+            for (let i = 1; i < jsonData.length; i++) {
+                const row = jsonData[i];
+                if (!row || row.length < 12) continue;
+                
+                const name = row[0] || '';
+                const cr = (row[1] || 'Unassigned').toString().trim();
+                
+                if (!name) continue;
+                
+                if (!controlRooms[cr]) {
+                    controlRooms[cr] = [];
+                }
+                
+                const memberData = {
+                    name: name,
+                    cr: cr,
+                    stats: {
+                        A: row[2] || 0,
+                        B: row[3] || 0,
+                        C: row[4] || 0,
+                        D: row[5] || 0,
+                        E: row[6] || 0,
+                        G: row[7] || 0,
+                        OFF: row[8] || 0,
+                        Leave: row[9] || 0,
+                        "Total working days": row[10] || 0,
+                        "Total hrs": row[11] || 0,
+                        "total night": row[12] || 0
+                    }
+                };
+                
+                controlRooms[cr].push(memberData);
+                allMembers.push(memberData);
+            }
+            
+            // Show the timeline view
+            document.getElementById('uploadContainer').style.display = 'none';
+            document.getElementById('timelineView').style.display = 'block';
+            
+            initializeTimelineView();
+            generateShareableLink();
+        }
+        
+        // Generate ultra-short shareable link (under 20 chars)
+        function generateShareableLink() {
+            // Create a unique 6-character hash from timestamp
+            const hash = Date.now().toString(36).slice(-6);
+            
+            // Store data in localStorage with this hash
+            localStorage.setItem('cr_'+hash, JSON.stringify({
+                controlRooms: controlRooms,
+                expires: Date.now() + 86400000 // 24h expiration
+            }));
+            
+            // Clean up old shared data
+            cleanUpOldSharedData();
+            
+            // Create extremely short share link
+            const shareLink = `${window.location.href.split('?')[0]}?id=${hash}`;
+            
+            document.getElementById('shareableLink').value = shareLink;
+            document.getElementById('shareContainer').style.display = 'block';
+            
+            // Set up copy button
+            document.getElementById('copyBtn').addEventListener('click', function() {
+                const linkInput = document.getElementById('shareableLink');
+                linkInput.select();
+                document.execCommand('copy');
+                this.textContent = 'Copied!';
+                setTimeout(() => this.textContent = 'Copy', 2000);
+            });
+        }
+        
+        // Clean up shared data older than 24 hours
+        function cleanUpOldSharedData() {
+            const now = Date.now();
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key.startsWith('cr_')) {
+                    try {
+                        const data = JSON.parse(localStorage.getItem(key));
+                        if (data.expires < now) {
+                            localStorage.removeItem(key);
+                        }
+                    } catch (e) {
+                        localStorage.removeItem(key);
+                    }
+                }
+            }
+        }
+        
+        // Load shared data from short URL
+        function loadSharedData() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const hash = urlParams.get('id');
+            
+            if (hash) {
+                try {
+                    // Hide share container when viewing shared link
+                    document.getElementById('shareContainer').style.display = 'none';
+                    
+                    // Get data from localStorage
+                    const storedData = JSON.parse(localStorage.getItem('cr_'+hash));
+                    
+                    if (storedData && storedData.expires > Date.now()) {
+                        controlRooms = storedData.controlRooms;
+                        allMembers = [];
+                        
+                        // Rebuild allMembers array
+                        Object.keys(controlRooms).forEach(cr => {
+                            allMembers = allMembers.concat(controlRooms[cr]);
+                        });
+                        
+                        // Show the dashboard view
+                        document.getElementById('uploadContainer').style.display = 'none';
+                        document.getElementById('timelineView').style.display = 'block';
+                        
+                        initializeTimelineView();
+                    } else {
+                        alert("This shared link has expired or is invalid.");
+                    }
+                } catch (error) {
+                    console.error("Error loading shared data:", error);
+                    alert("Error loading shared data.");
+                }
+            }
+        }
+        
+        function initializeTimelineView() {
+            const crButtonsContainer = document.getElementById('crButtons');
+            crButtonsContainer.innerHTML = '';
+            
+            // Create CR filter buttons
+            const crList = Object.keys(controlRooms).sort();
+            
+            // Add "All" button
+            const allBtn = document.createElement('button');
+            allBtn.className = 'cr-btn active';
+            allBtn.textContent = 'All';
+            allBtn.addEventListener('click', () => showAllMembers());
+            crButtonsContainer.appendChild(allBtn);
+            
+            // Add individual CR buttons
+            crList.forEach(cr => {
+                const btn = document.createElement('button');
+                btn.className = 'cr-btn';
+                btn.textContent = cr;
+                btn.addEventListener('click', () => showCRMembers(cr));
+                crButtonsContainer.appendChild(btn);
+            });
+            
+            // Setup search functionality
+            document.getElementById('searchInput').addEventListener('input', function() {
+                filterMembers(this.value.toLowerCase());
+            });
+            
+            // Show all members by default
+            showAllMembers();
+        }
+        
+        function showAllMembers() {
+            currentCR = 'All';
+            updateActiveButton();
+            renderMembers(allMembers);
+        }
+        
+        function showCRMembers(cr) {
+            currentCR = cr;
+            updateActiveButton();
+            renderMembers(controlRooms[cr]);
+        }
+        
+        function updateActiveButton() {
+            document.querySelectorAll('.cr-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (currentCR === 'All' && btn.textContent === 'All') {
+                    btn.classList.add('active');
+                } else if (btn.textContent === currentCR) {
+                    btn.classList.add('active');
+                }
+            });
+        }
+        
+        function filterMembers(searchTerm) {
+            let filteredMembers = [];
+            
+            if (currentCR === 'All') {
+                filteredMembers = allMembers.filter(member => 
+                    member.name.toLowerCase().includes(searchTerm)
+                );
+            } else {
+                filteredMembers = controlRooms[currentCR].filter(member => 
+                    member.name.toLowerCase().includes(searchTerm)
+                );
+            }
+            
+            renderMembers(filteredMembers);
+        }
+        
+        function renderMembers(members) {
+            const membersContainer = document.getElementById('membersContainer');
+            membersContainer.innerHTML = '';
+            
+            if (!members || members.length === 0) {
+                membersContainer.innerHTML = '<div style="text-align:center; padding:40px; color:#7f8c8d;">No members found</div>';
+                return;
+            }
+            
+            // Sort members alphabetically
+            const sortedMembers = [...members].sort((a, b) => a.name.localeCompare(b.name));
+            
+            sortedMembers.forEach((member, index) => {
+                const memberRow = document.createElement('div');
+                memberRow.className = 'member-row';
+                memberRow.style.animationDelay = `${index * 0.05}s`;
+                
+                // Header with name and CR
+                const header = document.createElement('div');
+                header.className = 'member-header';
+                
+                const nameDiv = document.createElement('div');
+                nameDiv.className = 'member-name';
+                nameDiv.textContent = member.name;
+                
+                const crDiv = document.createElement('div');
+                crDiv.className = 'member-cr';
+                crDiv.textContent = member.cr;
+                
+                header.appendChild(nameDiv);
+                header.appendChild(crDiv);
+                
+                // Stats grid
+                const statsGrid = document.createElement('div');
+                statsGrid.className = 'member-stats';
+                
+                const statItems = ['A', 'B', 'C', 'D', 'E', 'G', 'OFF', 'Leave'];
+                
+                statItems.forEach(stat => {
+                    const statItem = document.createElement('div');
+                    statItem.className = 'stat-item';
+                    
+                    const label = document.createElement('div');
+                    label.className = 'stat-label';
+                    label.textContent = stat;
+                    
+                    const value = document.createElement('div');
+                    value.className = 'stat-value';
+                    value.textContent = member.stats[stat] || 0;
+                    
+                    statItem.appendChild(label);
+                    statItem.appendChild(value);
+                    statsGrid.appendChild(statItem);
+                });
+                
+                // Summary container
+                const summaryContainer = document.createElement('div');
+                summaryContainer.className = 'summary-container';
+                
+                const summaryRow = document.createElement('div');
+                summaryRow.className = 'summary-row';
+                
+                const workingDays = document.createElement('div');
+                workingDays.className = 'summary-item';
+                workingDays.innerHTML = `
+                    <div class="summary-label">Working Days</div>
+                    <div class="summary-value">${member.stats['Total working days'] || 0}</div>
+                `;
+                
+                const totalHours = document.createElement('div');
+                totalHours.className = 'summary-item';
+                totalHours.innerHTML = `
+                    <div class="summary-label">Total Hours</div>
+                    <div class="summary-value">${member.stats['Total hrs'] || 0}</div>
+                `;
+                
+                const nightShifts = document.createElement('div');
+                nightShifts.className = 'summary-item';
+                nightShifts.innerHTML = `
+                    <div class="summary-label">Night Shifts</div>
+                    <div class="summary-value">${member.stats['total night'] || 0}</div>
+                `;
+                
+                summaryRow.appendChild(workingDays);
+                summaryRow.appendChild(totalHours);
+                summaryRow.appendChild(nightShifts);
+                summaryContainer.appendChild(summaryRow);
+                statsGrid.appendChild(summaryContainer);
+                
+                // Toggle stats visibility
+                header.addEventListener('click', () => {
+                    memberRow.classList.toggle('active');
+                });
+                
+                memberRow.appendChild(header);
+                memberRow.appendChild(statsGrid);
+                membersContainer.appendChild(memberRow);
+            });
+        }
+        
+        // Load shared data when page loads
+        window.addEventListener('load', loadSharedData);
+    </script>
+</body>
+</html>
