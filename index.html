@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Control Room Dashboard</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js"></script>
     <style>
         :root {
             --primary: #2c3e50;
@@ -348,7 +349,6 @@
         <p>Copy the link below to share this dashboard with others</p>
         <input type="text" class="share-link" id="shareLink" readonly>
         <button class="share-btn" onclick="copyShareLink()">Copy Link</button>
-        <p class="share-note">Note: Shared data will be available for 7 days</p>
     </div>
     
     <div class="dashboard" id="dashboard">
@@ -364,37 +364,20 @@
     <script>
         // Global variable to store the parsed data
         let controlRooms = {};
-        const STORAGE_PREFIX = "crDashboard_";
-        const SHORTENER_API = "https://api.shrtco.de/v2/shorten?url=";
         
         // Check for URL parameters on page load
         window.addEventListener('DOMContentLoaded', () => {
             const urlParams = new URLSearchParams(window.location.search);
-            const dataKey = urlParams.get('key');
+            const compressedData = urlParams.get('data');
             
-            if (dataKey) {
-                loadSharedData(dataKey);
-            } else {
-                // Initialize file input if no shared data
-                document.getElementById('fileInput').addEventListener('change', handleFileUpload);
-            }
-            cleanupExpiredData();
-        });
-        
-        function loadSharedData(dataKey) {
-            const savedData = localStorage.getItem(STORAGE_PREFIX + dataKey);
-            
-            if (savedData) {
+            if (compressedData) {
+                // SHARED VIEW MODE (Dashboard only)
                 try {
-                    const item = JSON.parse(savedData);
-                    if (item.expires && item.expires < Date.now()) {
-                        localStorage.removeItem(STORAGE_PREFIX + dataKey);
-                        throw new Error("Data expired");
-                    }
+                    // Decompress and parse the data
+                    const jsonData = LZString.decompressFromBase64(compressedData);
+                    controlRooms = JSON.parse(jsonData);
                     
-                    controlRooms = JSON.parse(item.data);
-                    
-                    // Hide upload container and show dashboard
+                    // Hide upload section and show dashboard
                     document.getElementById('uploadContainer').style.display = 'none';
                     document.getElementById('dashboard').style.display = 'flex';
                     document.getElementById('shareContainer').style.display = 'none';
@@ -402,15 +385,13 @@
                     
                     initializeDashboard();
                 } catch (e) {
-                    console.error('Error loading shared data:', e);
-                    alert('Error loading shared data. The link may have expired or is invalid.');
-                    document.getElementById('uploadContainer').style.display = 'block';
+                    alert("Invalid shared link. Please request a new one.");
                 }
             } else {
-                alert('Shared data not found. It may have expired after 7 days.');
-                document.getElementById('uploadContainer').style.display = 'block';
+                // UPLOAD MODE (Only shown to you)
+                document.getElementById('fileInput').addEventListener('change', handleFileUpload);
             }
-        }
+        });
         
         function handleFileUpload(event) {
             const file = event.target.files[0];
@@ -477,36 +458,16 @@
             generateShareLink();
         }
         
-        async function generateShareLink() {
-            // Generate a unique key for this data
-            const dataKey = 'key_' + Math.random().toString(36).substring(2, 15);
+        function generateShareLink() {
+            // 1. Compress the data to make URL smaller
+            const compressedData = LZString.compressToBase64(JSON.stringify(controlRooms));
             
-            // Store the data in localStorage with expiration
-            const expirationDate = new Date();
-            expirationDate.setDate(expirationDate.getDate() + 7); // 7 days from now
-            const dataToStore = {
-                data: JSON.stringify(controlRooms),
-                expires: expirationDate.getTime()
-            };
+            // 2. Create the shareable URL
+            const currentUrl = window.location.href.split('?')[0];
+            const shareUrl = `${currentUrl}?data=${compressedData}`;
             
-            localStorage.setItem(STORAGE_PREFIX + dataKey, JSON.stringify(dataToStore));
-            
-            // Create the shareable URL
-            const currentUrl = new URL(window.location.href.split('?')[0]);
-            currentUrl.searchParams.set('key', dataKey);
-            const longUrl = currentUrl.toString();
-            
-            try {
-                // Use URL shortener API
-                const response = await fetch(SHORTENER_API + encodeURIComponent(longUrl));
-                const json = await response.json();
-                const shortUrl = json.result.full_short_link;
-                
-                document.getElementById('shareLink').value = shortUrl;
-            } catch (e) {
-                console.error("URL shortening failed, using long URL:", e);
-                document.getElementById('shareLink').value = longUrl;
-            }
+            // 3. Display the shareable link
+            document.getElementById('shareLink').value = shareUrl;
         }
         
         function copyShareLink() {
@@ -522,23 +483,6 @@
             setTimeout(() => {
                 copyBtn.textContent = originalText;
             }, 2000);
-        }
-        
-        function cleanupExpiredData() {
-            const now = Date.now();
-            for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                if (key.startsWith(STORAGE_PREFIX)) {
-                    try {
-                        const item = JSON.parse(localStorage.getItem(key));
-                        if (item.expires && item.expires < now) {
-                            localStorage.removeItem(key);
-                        }
-                    } catch (e) {
-                        console.error('Error cleaning up data:', e);
-                    }
-                }
-            }
         }
         
         function initializeDashboard() {
@@ -657,42 +601,4 @@
             const totalHours = document.createElement('div');
             totalHours.className = 'summary-item';
             
-            const hoursLabel = document.createElement('div');
-            hoursLabel.className = 'summary-label';
-            hoursLabel.textContent = 'Total Hours';
-            
-            const hoursValue = document.createElement('div');
-            hoursValue.className = 'summary-value';
-            hoursValue.textContent = member.stats['Total hrs'];
-            
-            totalHours.appendChild(hoursLabel);
-            totalHours.appendChild(hoursValue);
-            
-            const nightShifts = document.createElement('div');
-            nightShifts.className = 'summary-item';
-            
-            const nightLabel = document.createElement('div');
-            nightLabel.className = 'summary-label';
-            nightLabel.textContent = 'Night Shifts';
-            
-            const nightValue = document.createElement('div');
-            nightValue.className = 'summary-value';
-            nightValue.textContent = member.stats['total night'];
-            
-            nightShifts.appendChild(nightLabel);
-            nightShifts.appendChild(nightValue);
-            
-            summary.appendChild(workingDays);
-            summary.appendChild(totalHours);
-            summary.appendChild(nightShifts);
-            
-            // Assemble the card
-            card.appendChild(header);
-            card.appendChild(statsGrid);
-            card.appendChild(summary);
-            
-            return card;
-        }
-    </script>
-</body>
-</html>
+     
