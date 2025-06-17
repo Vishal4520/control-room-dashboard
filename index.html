@@ -6,7 +6,327 @@
     <title>Control Room Dashboard</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
-        /* [Previous CSS styles remain exactly the same] */
+        :root {
+            --primary: #2c3e50;
+            --secondary: #3498db;
+            --accent: #e74c3c;
+            --light: #ecf0f1;
+            --dark: #2c3e50;
+            --success: #2ecc71;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: #f5f7fa;
+            color: var(--dark);
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            position: relative;
+        }
+        
+        .header h1 {
+            color: var(--primary);
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            position: relative;
+            display: inline-block;
+        }
+        
+        .header h1::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 4px;
+            background: var(--secondary);
+            border-radius: 2px;
+        }
+        
+        .header p {
+            color: #7f8c8d;
+            font-size: 1.1rem;
+        }
+        
+        .upload-container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+            margin: 0 auto 40px;
+            text-align: center;
+        }
+        
+        .upload-btn {
+            display: inline-block;
+            padding: 12px 24px;
+            background-color: var(--secondary);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-top: 15px;
+        }
+        
+        .upload-btn:hover {
+            background-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+        }
+        
+        .file-name {
+            margin-top: 15px;
+            color: var(--dark);
+            font-weight: bold;
+        }
+        
+        .dashboard {
+            display: none;
+            flex-direction: column;
+            gap: 30px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .share-container {
+            display: none;
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+            margin: 20px auto;
+            text-align: center;
+        }
+        
+        .share-btn {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: var(--success);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-top: 15px;
+        }
+        
+        .share-btn:hover {
+            background-color: #27ae60;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+        }
+        
+        .share-link {
+            margin-top: 15px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            width: 100%;
+            text-align: center;
+            font-size: 0.9rem;
+            word-break: break-all;
+        }
+        
+        .cr-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        
+        .cr-btn {
+            padding: 12px 20px;
+            background-color: var(--secondary);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .cr-btn:hover {
+            background-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+        }
+        
+        .cr-btn.active {
+            background-color: var(--accent);
+            transform: translateY(-2px);
+        }
+        
+        .members-container {
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+        
+        .members-container.active {
+            display: block;
+        }
+        
+        .member-card {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+            padding: 25px;
+            margin-bottom: 20px;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .member-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.15);
+        }
+        
+        .member-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 5px;
+            height: 100%;
+            background: var(--secondary);
+        }
+        
+        .member-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .member-name {
+            font-size: 1.5rem;
+            color: var(--primary);
+            font-weight: bold;
+        }
+        
+        .member-cr {
+            background-color: var(--light);
+            padding: 5px 15px;
+            border-radius: 50px;
+            font-size: 0.9rem;
+            color: var(--dark);
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-item {
+            background-color: var(--light);
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        
+        .stat-item:hover {
+            background-color: var(--secondary);
+            color: white;
+        }
+        
+        .stat-label {
+            font-size: 0.8rem;
+            color: #7f8c8d;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .stat-value {
+            font-size: 1.4rem;
+            font-weight: bold;
+            color: var(--primary);
+        }
+        
+        .stat-item:hover .stat-label,
+        .stat-item:hover .stat-value {
+            color: white;
+        }
+        
+        .summary {
+            display: flex;
+            justify-content: space-between;
+            background-color: var(--primary);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        
+        .summary-item {
+            text-align: center;
+        }
+        
+        .summary-label {
+            font-size: 0.9rem;
+            opacity: 0.8;
+            margin-bottom: 5px;
+        }
+        
+        .summary-value {
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+        
+        .no-members {
+            text-align: center;
+            padding: 40px;
+            color: #7f8c8d;
+            font-size: 1.2rem;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .highlight {
+            color: var(--accent);
+            font-weight: bold;
+        }
+        
+        @media (max-width: 768px) {
+            .stats-grid {
+                grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            }
+            
+            .summary {
+                flex-direction: column;
+                gap: 15px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -28,7 +348,6 @@
         <p>Copy the link below to share this dashboard with others</p>
         <input type="text" class="share-link" id="shareLink" readonly>
         <button class="share-btn" onclick="copyShareLink()">Copy Link</button>
-        <p class="share-note">Note: Shared data will be available for 7 days</p>
     </div>
     
     <div class="dashboard" id="dashboard">
@@ -44,44 +363,35 @@
     <script>
         // Global variable to store the parsed data
         let controlRooms = {};
-        const STORAGE_PREFIX = "crDashboard_";
         
         // Check for URL parameters on page load
         window.addEventListener('DOMContentLoaded', () => {
             const urlParams = new URLSearchParams(window.location.search);
-            const dataKey = urlParams.get('key');
+            const dataParam = urlParams.get('data');
             
-            if (dataKey) {
-                loadSharedData(dataKey);
+            if (dataParam) {
+                // SHARED VIEW MODE (Dashboard only)
+                try {
+                    controlRooms = JSON.parse(decodeURIComponent(dataParam));
+                    hideUploadSection();
+                    showDashboard();
+                } catch (e) {
+                    alert("Invalid shared data. Please check the link.");
+                }
             } else {
-                // Initialize file input if no shared data
+                // UPLOAD MODE (Only shown to you)
                 document.getElementById('fileInput').addEventListener('change', handleFileUpload);
             }
         });
         
-        function loadSharedData(dataKey) {
-            const savedData = localStorage.getItem(STORAGE_PREFIX + dataKey);
-            
-            if (savedData) {
-                try {
-                    controlRooms = JSON.parse(savedData);
-                    
-                    // Hide upload container and show dashboard
-                    document.getElementById('uploadContainer').style.display = 'none';
-                    document.getElementById('dashboard').style.display = 'flex';
-                    document.getElementById('shareContainer').style.display = 'block';
-                    document.getElementById('dashboard-description').textContent = 'Viewing shared control room data';
-                    
-                    initializeDashboard();
-                } catch (e) {
-                    console.error('Error parsing shared data:', e);
-                    alert('Error loading shared data. The link may have expired or is invalid.');
-                    document.getElementById('uploadContainer').style.display = 'block';
-                }
-            } else {
-                alert('Shared data not found. It may have expired after 7 days.');
-                document.getElementById('uploadContainer').style.display = 'block';
-            }
+        function hideUploadSection() {
+            document.getElementById('uploadContainer').style.display = 'none';
+            document.getElementById('dashboard-description').textContent = 'Control Room Dashboard (Shared View)';
+        }
+        
+        function showDashboard() {
+            document.getElementById('dashboard').style.display = 'flex';
+            initializeDashboard();
         }
         
         function handleFileUpload(event) {
@@ -140,12 +450,8 @@
                 });
             }
             
-            // Show the dashboard and share container
-            document.getElementById('uploadContainer').style.display = 'none';
-            document.getElementById('dashboard').style.display = 'flex';
-            document.getElementById('shareContainer').style.display = 'block';
-            
-            initializeDashboard();
+            hideUploadSection();
+            showDashboard();
             generateShareLink();
         }
         
@@ -303,26 +609,17 @@
         }
         
         function generateShareLink() {
-            // Generate a unique key for this data
-            const dataKey = 'key_' + Math.random().toString(36).substring(2, 15);
-            
-            // Store the data in localStorage with expiration
-            const expirationDate = new Date();
-            expirationDate.setDate(expirationDate.getDate() + 7); // 7 days from now
-            const dataToStore = {
-                data: JSON.stringify(controlRooms),
-                expires: expirationDate.getTime()
-            };
-            
-            localStorage.setItem(STORAGE_PREFIX + dataKey, JSON.stringify(dataToStore));
+            // Convert the data to a JSON string and encode it for URL
+            const dataString = JSON.stringify(controlRooms);
+            const encodedData = encodeURIComponent(dataString);
             
             // Create the shareable URL
-            const currentUrl = new URL(window.location.href);
-            currentUrl.searchParams.set('key', dataKey);
-            const shareUrl = currentUrl.toString();
+            const currentUrl = window.location.href.split('?')[0];
+            const shareUrl = `${currentUrl}?data=${encodedData}`;
             
             // Display the shareable link
             document.getElementById('shareLink').value = shareUrl;
+            document.getElementById('shareContainer').style.display = 'block';
         }
         
         function copyShareLink() {
@@ -339,27 +636,6 @@
                 copyBtn.textContent = originalText;
             }, 2000);
         }
-        
-        // Clean up expired data on load
-        function cleanupExpiredData() {
-            const now = new Date().getTime();
-            for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                if (key.startsWith(STORAGE_PREFIX)) {
-                    try {
-                        const item = JSON.parse(localStorage.getItem(key));
-                        if (item.expires && item.expires < now) {
-                            localStorage.removeItem(key);
-                        }
-                    } catch (e) {
-                        console.error('Error cleaning up data:', e);
-                    }
-                }
-            }
-        }
-        
-        // Run cleanup on load
-        cleanupExpiredData();
     </script>
 </body>
 </html>
