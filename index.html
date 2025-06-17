@@ -373,8 +373,17 @@
             if (compressedData) {
                 // SHARED VIEW MODE (Dashboard only)
                 try {
-                    // Decompress and parse the data
-                    const jsonData = LZString.decompressFromBase64(compressedData);
+                    // First try decoding normally
+                    let jsonData = LZString.decompressFromBase64(compressedData);
+                    
+                    // If that fails, try URI-decoding first (fix for mobile)
+                    if (!jsonData) {
+                        const uriDecoded = decodeURIComponent(compressedData);
+                        jsonData = LZString.decompressFromBase64(uriDecoded);
+                    }
+                    
+                    if (!jsonData) throw new Error("Failed to decompress data");
+                    
                     controlRooms = JSON.parse(jsonData);
                     
                     // Hide upload section and show dashboard
@@ -385,7 +394,9 @@
                     
                     initializeDashboard();
                 } catch (e) {
-                    alert("Invalid shared link. Please request a new one.");
+                    console.error("Error loading shared data:", e);
+                    alert("Could not load shared dashboard. Please ask for a new link.");
+                    document.getElementById('uploadContainer').style.display = 'block';
                 }
             } else {
                 // UPLOAD MODE (Only shown to you)
@@ -460,13 +471,17 @@
         
         function generateShareLink() {
             // 1. Compress the data to make URL smaller
-            const compressedData = LZString.compressToBase64(JSON.stringify(controlRooms));
+            const jsonStr = JSON.stringify(controlRooms);
+            let compressedData = LZString.compressToBase64(jsonStr);
             
-            // 2. Create the shareable URL
+            // 2. Ensure the compressed data is URL-safe (especially for mobile)
+            compressedData = encodeURIComponent(compressedData);
+            
+            // 3. Create the shareable URL
             const currentUrl = window.location.href.split('?')[0];
             const shareUrl = `${currentUrl}?data=${compressedData}`;
             
-            // 3. Display the shareable link
+            // 4. Display the shareable link
             document.getElementById('shareLink').value = shareUrl;
         }
         
@@ -582,23 +597,4 @@
             
             // Summary section
             const summary = document.createElement('div');
-            summary.className = 'summary';
-            
-            const workingDays = document.createElement('div');
-            workingDays.className = 'summary-item';
-            
-            const daysLabel = document.createElement('div');
-            daysLabel.className = 'summary-label';
-            daysLabel.textContent = 'Working Days';
-            
-            const daysValue = document.createElement('div');
-            daysValue.className = 'summary-value';
-            daysValue.textContent = member.stats['Total working days'];
-            
-            workingDays.appendChild(daysLabel);
-            workingDays.appendChild(daysValue);
-            
-            const totalHours = document.createElement('div');
-            totalHours.className = 'summary-item';
-            
-     
+ 
