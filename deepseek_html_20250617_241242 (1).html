@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control Room Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --primary: #16a34a;
+            --secondary: #22c55e;
+            --accent: #4ade80;
+            --light: #f0fdf4;
+            --dark: #052e16;
+            --gradient-start: #16a34a;
+            --gradient-end: #22c55e;
+            --stat-bg: #f8fafc;
+            --stat-border: #e2e8f0;
+            --shift-a: #f59e0b;
+            --shift-b: #10b981;
+            --shift-c: #8b5cf6;
+            --shift-d: #ec4899;
+            --shift-e: #6366f1;
+            --shift-g: #f97316;
+            --shift-t: #14b8a6;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: #f7fee7;
+            color: var(--dark);
+            padding: 16px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
+        .title-editor {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .title-input {
+            flex: 1;
+            max-width: 500px;
+            padding: 10px 15px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 1.2rem;
+            font-weight: 600;
+            text-align: center;
+            background: linear-gradient(135deg, rgba(22, 163, 74, 0.05), rgba(34, 197, 94, 0.05));
+            color: var(--dark);
+        }
+        
+        .title-input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.2);
+        }
+        
+        .header p {
+            color: #64748b;
+            font-size: 0.9rem;
+        }
+        
+        /* Upload Container */
+        .upload-container {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            max-width: 500px;
+            margin: 0 auto 24px;
+            text-align: center;
+        }
+        
+        .upload-container h2 {
+            font-size: 1.3rem;
+            margin-bottom: 10px;
+            color: var(--primary);
+            font-weight: 600;
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        
+        .file-upload {
+            position: relative;
+            margin: 20px 0;
+        }
+        
+        .file-upload input[type="file"] {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+        }
+        
+        .file-upload label {
+            display: inline-block;
+            padding: 12px 24px;
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+            color: white;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .file-upload label:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            background: linear-gradient(135deg, #15803d, #16a34a);
+        }
+        
+        .file-name {
+            font-size: 0.8rem;
+            margin-top: 10px;
+            color: #64748b;
+        }
+        
+        /* Share Link Container (Only in Dashboard View) */
+        .share-container {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            max-width: 500px;
+            margin: 20px auto;
+            display: none;
+        }
+        
+        .share-container h3 {
+            font-size: 1.1rem;
+            margin-bottom: 15px;
+            color: var(--primary);
+            text-align: center;
+        }
+        
+        .share-box {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .share-link {
+            flex: 1;
+            padding: 10px 15px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            background: #f8fafc;
+            color: #334155;
+        }
+        
+        .copy-btn {
+            padding: 0 15px;
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        .copy-btn:hover {
+            background: linear-gradient(135deg, #15803d, #16a34a);
+        }
+        
+        /* Timeline View */
+        .timeline-view {
+            display: none;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        
+        /* CR Buttons */
+        .cr-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        
+        .cr-btn {
+            padding: 8px 16px;
+            background: #dcfce7;
+            color: var(--primary);
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        
+        .cr-btn:hover {
+            background: #bbf7d0;
+            transform: translateY(-1px);
+        }
+        
+        .cr-btn.active {
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+            color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        /* Name List */
+        .names-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 12px;
+        }
+        
+        .name-item {
+            background: white;
+            border-radius: 10px;
+            padding: 14px 18px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 4px solid var(--primary);
+        }
+        
+        .name-item:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            background: linear-gradient(90deg, rgba(22, 163, 74, 0.05) 0%, rgba(34, 197, 94, 0.05) 100%);
+        }
+        
+        .name-text {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--primary);
+        }
+        
+        .cr-badge {
+            background: var(--secondary);
+            color: white;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+        
+        /* Shift Details Card */
+        .shift-details {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 6px 15px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-top: 20px;
+            display: none;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .shift-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        
+        .shift-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+        
+        .shift-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+        
+        .stat-item {
+            background: var(--stat-bg);
+            border: 1px solid var(--stat-border);
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+            transition: all 0.2s;
+        }
+        
+        .stat-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        
+        .stat-item.shift-A { border-top: 3px solid var(--shift-a); }
+        .stat-item.shift-B { border-top: 3px solid var(--shift-b); }
+        .stat-item.shift-C { border-top: 3px solid var(--shift-c); }
+        .stat-item.shift-D { border-top: 3px solid var(--shift-d); }
+        .stat-item.shift-E { border-top: 3px solid var(--shift-e); }
+        .stat-item.shift-G { border-top: 3px solid var(--shift-g); }
+        .stat-item.shift-T { border-top: 3px solid var(--shift-t); }
+        
+        .stat-label {
+            font-size: 0.7rem;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+        
+        .stat-value {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--dark);
+        }
+        
+        .summary-container {
+            grid-column: 1 / -1;
+            margin-top: 16px;
+            background: linear-gradient(135deg, rgba(22, 163, 74, 0.05), rgba(34, 197, 94, 0.05));
+            border-radius: 8px;
+            padding: 16px;
+        }
+        
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .summary-item {
+            text-align: center;
+            flex: 1;
+        }
+        
+        .summary-label {
+            font-size: 0.75rem;
+            color: #64748b;
+            margin-bottom: 6px;
+        }
+        
+        .summary-value {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .names-list {
+                grid-template-columns: 1fr;
+            }
+            
+            .shift-stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="title-editor">
+            <input type="text" id="dashboardTitle" class="title-input" value="Control Room Dashboard" placeholder="Enter dashboard title">
+        </div>
+        <p id="dashboard-description">Team shift statistics at a glance</p>
+    </div>
+    
+    <div class="upload-container" id="uploadContainer">
+        <h2>Upload Shift Data</h2>
+        <p>Select Excel file to view team statistics</p>
+        <div class="file-upload">
+            <input type="file" id="fileInput" accept=".xlsx, .xls">
+            <label for="fileInput">Choose File</label>
+            <div class="file-name" id="fileName">No file selected</div>
+        </div>
+    </div>
+    
+    <!-- Share Container (Only shown in dashboard view) -->
+    <div class="share-container" id="shareContainer">
+        <h3>Share This Dashboard</h3>
+        <div class="share-box">
+            <input type="text" id="shareableLink" class="share-link" readonly>
+            <button class="copy-btn" id="copyBtn">Copy</button>
+        </div>
+    </div>
+    
+    <div class="timeline-view" id="timelineView">
+        <div class="cr-buttons" id="crButtons"></div>
+        <div class="names-list" id="namesList"></div>
+        <div class="shift-details" id="shiftDetails"></div>
+    </div>
+
+    <script>
+        let controlRooms = {};
+        let currentCR = '';
+        let currentMember = null;
+        
+        // Title Editor
+        const titleInput = document.getElementById('dashboardTitle');
+        titleInput.addEventListener('input', function() {
+            document.title = this.value;
+        });
+        
+        // File Upload Handling - FIXED VERSION
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            document.getElementById('fileName').textContent = file.name;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    processExcel(data);
+                    generateShareableLink(file);
+                } catch (error) {
+                    console.error("Error processing file:", error);
+                    alert("Error processing the file. Please make sure it's a valid Excel file.");
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        });
+        
+        function processExcel(data) {
+            try {
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                
+                controlRooms = {};
+                
+                for (let i = 1; i < jsonData.length; i++) {
+                    const row = jsonData[i];
+                    if (!row || row.length < 22) continue;
+                    
+                    const name = row[1] || '';
+                    const cr = (row[2] || '').toString().trim();
+                    
+                    if (!name || !cr) continue;
+                    
+                    if (!controlRooms[cr]) {
+                        controlRooms[cr] = [];
+                    }
+                    
+                    controlRooms[cr].push({
+                        name: name,
+                        stats: {
+                            A: row[3] || 0,
+                            B: row[4] || 0,
+                            C: row[5] || 0,
+                            D: row[6] || 0,
+                            E: row[7] || 0,
+                            G: row[8] || 0,
+                            T: row[9] || 0,
+                            OFF: row[17] || 0,
+                            Leave: row[18] || 0,
+                            "Total working days": row[19] || 0,
+                            "Total hrs": row[20] || 0,
+                            "total night": row[21] || 0
+                        }
+                    });
+                }
+                
+                document.getElementById('uploadContainer').style.display = 'none';
+                document.getElementById('timelineView').style.display = 'block';
+                initializeTimelineView();
+            } catch (error) {
+                console.error("Error processing Excel:", error);
+                alert("Error processing Excel file. Please check the file format.");
+            }
+        }
+        
+        // Generate shareable link
+        function generateShareableLink(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const base64data = e.target.result.split(',')[1];
+                const dataUrl = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${base64data}`;
+                const encodedData = encodeURIComponent(dataUrl);
+                const shareLink = `${window.location.href.split('?')[0]}?data=${encodedData}&title=${encodeURIComponent(titleInput.value)}`;
+                
+                document.getElementById('shareableLink').value = shareLink;
+                document.getElementById('shareContainer').style.display = 'block';
+                
+                // Set up copy button
+                document.getElementById('copyBtn').addEventListener('click', function() {
+                    const linkInput = document.getElementById('shareableLink');
+                    linkInput.select();
+                    document.execCommand('copy');
+                    this.textContent = 'Copied!';
+                    setTimeout(() => this.textContent = 'Copy', 2000);
+                });
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        // Load shared data
+        window.addEventListener('load', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const sharedData = urlParams.get('data');
+            const sharedTitle = urlParams.get('title');
+            
+            if (sharedTitle) {
+                titleInput.value = decodeURIComponent(sharedTitle);
+                document.title = decodeURIComponent(sharedTitle);
+            }
+            
+            if (sharedData) {
+                try {
+                    const decodedData = decodeURIComponent(sharedData);
+                    const byteString = atob(decodedData.split(',')[1]);
+                    const byteNumbers = new Array(byteString.length);
+                    
+                    for (let i = 0; i < byteString.length; i++) {
+                        byteNumbers[i] = byteString.charCodeAt(i);
+                    }
+                    
+                    const byteArray = new Uint8Array(byteNumbers);
+                    processExcel(byteArray);
+                    
+                    // Show share container for shared dashboards
+                    document.getElementById('shareContainer').style.display = 'block';
+                    document.getElementById('shareableLink').value = window.location.href;
+                } catch (error) {
+                    console.error("Error loading shared data:", error);
+                    alert("Error loading shared data. The link may be invalid.");
+                }
+            }
+        });
+        
+        function initializeTimelineView() {
+            const crButtonsContainer = document.getElementById('crButtons');
+            crButtonsContainer.innerHTML = '';
+            
+            Object.keys(controlRooms).sort().forEach(cr => {
+                const btn = document.createElement('button');
+                btn.className = 'cr-btn';
+                btn.textContent = cr;
+                btn.addEventListener('click', () => showCRNames(cr));
+                crButtonsContainer.appendChild(btn);
+            });
+            
+            if (Object.keys(controlRooms).length > 0) {
+                const firstCr = Object.keys(controlRooms).sort()[0];
+                showCRNames(firstCr);
+                document.querySelector('.cr-btn').classList.add('active');
+            }
+        }
+        
+        function showCRNames(cr) {
+            currentCR = cr;
+            currentMember = null;
+            const namesList = document.getElementById('namesList');
+            namesList.innerHTML = '';
+            document.getElementById('shiftDetails').style.display = 'none';
+            
+            document.querySelectorAll('.cr-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent === cr);
+            });
+            
+            if (!controlRooms[cr] || controlRooms[cr].length === 0) {
+                namesList.innerHTML = `
+                    <div style="grid-column:1/-1; text-align:center; padding:40px; color:#64748b;">
+                        No members found in this control room
+                    </div>
+                `;
+                return;
+            }
+            
+            const sortedMembers = [...controlRooms[cr]].sort((a, b) => a.name.localeCompare(b.name));
+            
+            sortedMembers.forEach(member => {
+                const nameItem = document.createElement('div');
+                nameItem.className = 'name-item';
+                
+                const nameText = document.createElement('div');
+                nameText.className = 'name-text';
+                nameText.textContent = member.name;
+                
+                const crBadge = document.createElement('div');
+                crBadge.className = 'cr-badge';
+                crBadge.textContent = cr;
+                
+                nameItem.appendChild(nameText);
+                nameItem.appendChild(crBadge);
+                
+                nameItem.addEventListener('click', () => showShiftDetails(member));
+                
+                namesList.appendChild(nameItem);
+            });
+        }
+        
+        function showShiftDetails(member) {
+            currentMember = member;
+            const shiftDetails = document.getElementById('shiftDetails');
+            shiftDetails.style.display = 'block';
+            shiftDetails.innerHTML = '';
+            
+            // Header
+            const header = document.createElement('div');
+            header.className = 'shift-header';
+            
+            const title = document.createElement('div');
+            title.className = 'shift-title';
+            title.textContent = member.name;
+            
+            const crBadge = document.createElement('div');
+            crBadge.className = 'cr-badge';
+            crBadge.textContent = currentCR;
+            
+            header.appendChild(title);
+            header.appendChild(crBadge);
+            
+            // Stats Grid
+            const statsGrid = document.createElement('div');
+            statsGrid.className = 'shift-stats';
+            
+            // Shift Types with colored borders
+            const shifts = [
+                { code: 'A', color: 'shift-a' },
+                { code: 'B', color: 'shift-b' },
+                { code: 'C', color: 'shift-c' },
+                { code: 'D', color: 'shift-d' },
+                { code: 'E', color: 'shift-e' },
+                { code: 'G', color: 'shift-g' },
+                { code: 'T', color: 'shift-t' }
+            ];
+            
+            shifts.forEach(shift => {
+                const statItem = document.createElement('div');
+                statItem.className = `stat-item shift-${shift.code}`;
+                statItem.innerHTML = `
+                    <div class="stat-label">${shift.code} Shift</div>
+                    <div class="stat-value">${member.stats[shift.code] || 0}</div>
+                `;
+                statsGrid.appendChild(statItem);
+            });
+            
+            // OFF/Leave
+            const offLeave = ['OFF', 'Leave'];
+            offLeave.forEach(item => {
+                const statItem = document.createElement('div');
+                statItem.className = 'stat-item';
+                statItem.innerHTML = `
+                    <div class="stat-label">${item}</div>
+                    <div class="stat-value">${member.stats[item] || 0}</div>
+                `;
+                statsGrid.appendChild(statItem);
+            });
+            
+            // Summary Row
+            const summaryContainer = document.createElement('div');
+            summaryContainer.className = 'summary-container';
+            summaryContainer.innerHTML = `
+                <div class="summary-row">
+                    <div class="summary-item">
+                        <div class="summary-label">Working Days</div>
+                        <div class="summary-value">${member.stats['Total working days'] || 0}</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-label">Total Hours</div>
+                        <div class="summary-value">${member.stats['Total hrs'] || 0}</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-label">Night Shifts</div>
+                        <div class="summary-value">${member.stats['total night'] || 0}</div>
+                    </div>
+                </div>
+            `;
+            
+            statsGrid.appendChild(summaryContainer);
+            shiftDetails.appendChild(header);
+            shiftDetails.appendChild(statsGrid);
+            
+            // Scroll to details
+            shiftDetails.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    </script>
+</body>
+</html>
